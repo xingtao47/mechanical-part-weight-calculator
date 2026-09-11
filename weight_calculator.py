@@ -1,7 +1,7 @@
 import math
 
 
-VERSION = "1.1"
+VERSION = "1.2"
 MATERIALS = {
     "1": ("钢", 7.85),
     "2": ("铝", 2.70),
@@ -19,6 +19,34 @@ def read_positive_number(prompt):
             print("输入错误：数值必须大于 0，请重新输入。")
         except ValueError:
             print("输入错误：请输入数字，例如 10 或 10.5。")
+
+
+def read_inner_diameter(outer_diameter):
+    while True:
+        inner_diameter = read_positive_number("请输入圆柱内径：")
+
+        if inner_diameter < outer_diameter:
+            return inner_diameter
+
+        print(
+            f"输入错误：内径必须小于外径 {outer_diameter:g}，请重新输入。"
+        )
+
+
+def choose_part_type():
+    print("\n请选择零件类型：")
+    print("1. 实心圆柱")
+    print("2. 空心圆柱")
+
+    while True:
+        part_choice = input("请输入选项 1/2：").strip()
+
+        if part_choice in ("1", "2"):
+            return part_choice
+
+        print("输入错误：请选择 1 或 2。")
+
+
 def choose_unit():
     print("\n请选择尺寸单位：")
     print("1. 毫米（mm）")
@@ -52,28 +80,60 @@ def choose_material():
         print("输入错误：请选择 1、2、3 或 4。")
 
 
+def calculate_solid_cylinder_volume(diameter_cm, length_cm):
+    radius_cm = diameter_cm / 2
+    return math.pi * radius_cm ** 2 * length_cm
+
+
+def calculate_hollow_cylinder_volume(
+    outer_diameter_cm, inner_diameter_cm, length_cm
+):
+    outer_radius_cm = outer_diameter_cm / 2
+    inner_radius_cm = inner_diameter_cm / 2
+    return math.pi * (outer_radius_cm ** 2 - inner_radius_cm ** 2) * length_cm
+
+
 def calculate_once():
     print("=" * 40)
     print(f"机械零件重量计算器 V{VERSION}")
     print("=" * 40)
+    part_choice = choose_part_type()
     unit_name, conversion_factor = choose_unit()
-    diameter = read_positive_number("请输入圆柱直径：")
-    length = read_positive_number("请输入圆柱长度：")
 
-    print("直径：", diameter, unit_name)
-    print("长度：", length, unit_name)
+    if part_choice == "1":
+        diameter = read_positive_number("请输入圆柱直径：")
+        length = read_positive_number("请输入圆柱长度：")
+        print("直径：", diameter, unit_name)
+        print("长度：", length, unit_name)
+    else:
+        outer_diameter = read_positive_number("请输入圆柱外径：")
+        inner_diameter = read_inner_diameter(outer_diameter)
+        length = read_positive_number("请输入圆柱长度：")
+        print("外径：", outer_diameter, unit_name)
+        print("内径：", inner_diameter, unit_name)
+        print("长度：", length, unit_name)
+
     material_name, density = choose_material()
 
     print("材料：", material_name)
     print("密度：", density, "g/cm^3")
 
-    diameter_cm = diameter * conversion_factor
     length_cm = length * conversion_factor
 
-    print("换算后的直径：", diameter_cm, "cm")
+    if part_choice == "1":
+        diameter_cm = diameter * conversion_factor
+        print("换算后的直径：", diameter_cm, "cm")
+        volume_cm3 = calculate_solid_cylinder_volume(diameter_cm, length_cm)
+    else:
+        outer_diameter_cm = outer_diameter * conversion_factor
+        inner_diameter_cm = inner_diameter * conversion_factor
+        print("换算后的外径：", outer_diameter_cm, "cm")
+        print("换算后的内径：", inner_diameter_cm, "cm")
+        volume_cm3 = calculate_hollow_cylinder_volume(
+            outer_diameter_cm, inner_diameter_cm, length_cm
+        )
+
     print("换算后的长度：", length_cm, "cm")
-    radius_cm = diameter_cm / 2
-    volume_cm3 = math.pi * radius_cm ** 2 * length_cm
 
     weight_g = volume_cm3 * density
     weight_kg = weight_g / 1000
@@ -82,17 +142,26 @@ def calculate_once():
     print("体积：", round(volume_cm3, 2), "cm^3")
     print("重量：", round(weight_g, 2), "g")
     print("重量：", round(weight_kg, 3), "kg")
-while True:
-    calculate_once()
 
+
+def main():
     while True:
-        again = input("\n是否继续计算？输入 y 继续，输入 n 结束：").strip().lower()
+        calculate_once()
 
-        if again in ("y", "n"):
+        while True:
+            again = input(
+                "\n是否继续计算？输入 y 继续，输入 n 结束："
+            ).strip().lower()
+
+            if again in ("y", "n"):
+                break
+
+            print("输入错误：请输入 y 或 n。")
+
+        if again == "n":
+            print("程序已结束。")
             break
 
-        print("输入错误：请输入 y 或 n。")
 
-    if again == "n":
-        print("程序已结束。")
-        break
+if __name__ == "__main__":
+    main()
