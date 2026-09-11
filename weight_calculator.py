@@ -1,4 +1,15 @@
 import math
+
+
+VERSION = "1.1"
+MATERIALS = {
+    "1": ("钢", 7.85),
+    "2": ("铝", 2.70),
+    "3": ("铜", 8.96),
+    "4": ("钛", 4.51),
+}
+
+
 def read_positive_number(prompt):
     while True:
         try:
@@ -25,28 +36,25 @@ def choose_unit():
             return "米", 100
 
         print("输入错误：请选择 1、2 或 3。")
+
+
 def choose_material():
     print("\n请选择材料：")
-    print("1. 钢")
-    print("2. 铝")
-    print("3. 铜")
+    for option, (material_name, _) in MATERIALS.items():
+        print(f"{option}. {material_name}")
 
     while True:
-        material_choice = input("请输入选项 1/2/3：")
+        material_choice = input("请输入选项 1/2/3/4：").strip()
 
-        if material_choice == "1":
-            return "钢", 7.85
-        if material_choice == "2":
-            return "铝", 2.70
-        if material_choice == "3":
-            return "铜", 8.96
+        if material_choice in MATERIALS:
+            return MATERIALS[material_choice]
 
-        print("输入错误：请选择 1、2 或 3。")
+        print("输入错误：请选择 1、2、3 或 4。")
 
 
 def calculate_once():
     print("=" * 40)
-    print("机械零件重量计算器 V1.0")
+    print(f"机械零件重量计算器 V{VERSION}")
     print("=" * 40)
     unit_name, conversion_factor = choose_unit()
     diameter = read_positive_number("请输入圆柱直径：")
@@ -57,7 +65,7 @@ def calculate_once():
     material_name, density = choose_material()
 
     print("材料：", material_name)
-    print("密度：", density, "g/cm³")
+    print("密度：", density, "g/cm^3")
 
     diameter_cm = diameter * conversion_factor
     length_cm = length * conversion_factor
@@ -71,7 +79,7 @@ def calculate_once():
     weight_kg = weight_g / 1000
 
     print("\n计算结果：")
-    print("体积：", round(volume_cm3, 2), "cm³")
+    print("体积：", round(volume_cm3, 2), "cm^3")
     print("重量：", round(weight_g, 2), "g")
     print("重量：", round(weight_kg, 3), "kg")
 while True:
