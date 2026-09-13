@@ -1,7 +1,7 @@
 import math
 
 
-VERSION = "1.2"
+VERSION = "1.3"
 MATERIALS = {
     "1": ("钢", 7.85),
     "2": ("铝", 2.70),
@@ -37,14 +37,15 @@ def choose_part_type():
     print("\n请选择零件类型：")
     print("1. 实心圆柱")
     print("2. 空心圆柱")
+    print("3. 矩形块")
 
     while True:
-        part_choice = input("请输入选项 1/2：").strip()
+        part_choice = input("请输入选项 1/2/3：").strip()
 
-        if part_choice in ("1", "2"):
+        if part_choice in ("1", "2", "3"):
             return part_choice
 
-        print("输入错误：请选择 1 或 2。")
+        print("输入错误：请选择 1、2 或 3。")
 
 
 def choose_unit():
@@ -93,6 +94,10 @@ def calculate_hollow_cylinder_volume(
     return math.pi * (outer_radius_cm ** 2 - inner_radius_cm ** 2) * length_cm
 
 
+def calculate_rectangular_prism_volume(length_cm, width_cm, height_cm):
+    return length_cm * width_cm * height_cm
+
+
 def calculate_once():
     print("=" * 40)
     print(f"机械零件重量计算器 V{VERSION}")
@@ -105,13 +110,20 @@ def calculate_once():
         length = read_positive_number("请输入圆柱长度：")
         print("直径：", diameter, unit_name)
         print("长度：", length, unit_name)
-    else:
+    elif part_choice == "2":
         outer_diameter = read_positive_number("请输入圆柱外径：")
         inner_diameter = read_inner_diameter(outer_diameter)
         length = read_positive_number("请输入圆柱长度：")
         print("外径：", outer_diameter, unit_name)
         print("内径：", inner_diameter, unit_name)
         print("长度：", length, unit_name)
+    else:
+        length = read_positive_number("请输入矩形块长度：")
+        width = read_positive_number("请输入矩形块宽度：")
+        height = read_positive_number("请输入矩形块高度：")
+        print("长度：", length, unit_name)
+        print("宽度：", width, unit_name)
+        print("高度：", height, unit_name)
 
     material_name, density = choose_material()
 
@@ -123,17 +135,26 @@ def calculate_once():
     if part_choice == "1":
         diameter_cm = diameter * conversion_factor
         print("换算后的直径：", diameter_cm, "cm")
+        print("换算后的长度：", length_cm, "cm")
         volume_cm3 = calculate_solid_cylinder_volume(diameter_cm, length_cm)
-    else:
+    elif part_choice == "2":
         outer_diameter_cm = outer_diameter * conversion_factor
         inner_diameter_cm = inner_diameter * conversion_factor
         print("换算后的外径：", outer_diameter_cm, "cm")
         print("换算后的内径：", inner_diameter_cm, "cm")
+        print("换算后的长度：", length_cm, "cm")
         volume_cm3 = calculate_hollow_cylinder_volume(
             outer_diameter_cm, inner_diameter_cm, length_cm
         )
-
-    print("换算后的长度：", length_cm, "cm")
+    else:
+        width_cm = width * conversion_factor
+        height_cm = height * conversion_factor
+        print("换算后的长度：", length_cm, "cm")
+        print("换算后的宽度：", width_cm, "cm")
+        print("换算后的高度：", height_cm, "cm")
+        volume_cm3 = calculate_rectangular_prism_volume(
+            length_cm, width_cm, height_cm
+        )
 
     weight_g = volume_cm3 * density
     weight_kg = weight_g / 1000
