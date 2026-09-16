@@ -1,7 +1,7 @@
 import math
 
 
-VERSION = "1.3"
+VERSION = "1.4"
 MATERIALS = {
     "1": ("钢", 7.85),
     "2": ("铝", 2.70),
@@ -19,6 +19,27 @@ def read_positive_number(prompt):
             print("输入错误：数值必须大于 0，请重新输入。")
         except ValueError:
             print("输入错误：请输入数字，例如 10 或 10.5。")
+
+
+def read_part_name():
+    while True:
+        part_name = input("请输入零件名称：").strip()
+
+        if part_name:
+            return part_name
+
+        print("输入错误：零件名称不能为空，请重新输入。")
+
+
+def read_positive_integer(prompt):
+    while True:
+        try:
+            value = int(input(prompt))
+            if value > 0:
+                return value
+            print("输入错误：数量必须是正整数，请重新输入。")
+        except ValueError:
+            print("输入错误：数量必须是正整数，请重新输入。")
 
 
 def read_inner_diameter(outer_diameter):
@@ -98,10 +119,51 @@ def calculate_rectangular_prism_volume(length_cm, width_cm, height_cm):
     return length_cm * width_cm * height_cm
 
 
+def calculate_weight(volume_cm3, density_g_per_cm3):
+    return volume_cm3 * density_g_per_cm3 / 1000
+
+
+def create_part_record(name, quantity, unit_weight_kg):
+    return {
+        "name": name,
+        "quantity": quantity,
+        "unit_weight_kg": unit_weight_kg,
+        "total_weight_kg": unit_weight_kg * quantity,
+    }
+
+
+def calculate_summary_totals(records):
+    total_quantity = sum(record["quantity"] for record in records)
+    total_weight_kg = sum(record["total_weight_kg"] for record in records)
+    return total_quantity, total_weight_kg
+
+
+def print_summary(records):
+    total_quantity, total_weight_kg = calculate_summary_totals(records)
+
+    print("\n零件汇总：")
+    print(f"{'零件名称':<16}{'数量':>6}{'单件重量':>16}{'小计':>16}")
+    print("-" * 54)
+
+    for record in records:
+        print(
+            f"{record['name']:<16}"
+            f"{record['quantity']:>6}"
+            f"{record['unit_weight_kg']:>13.3f} kg"
+            f"{record['total_weight_kg']:>13.3f} kg"
+        )
+
+    print("-" * 54)
+    print(f"总数量：{total_quantity}")
+    print(f"总重量：{total_weight_kg:.3f} kg")
+
+
 def calculate_once():
     print("=" * 40)
     print(f"机械零件重量计算器 V{VERSION}")
     print("=" * 40)
+    part_name = read_part_name()
+    quantity = read_positive_integer("请输入零件数量：")
     part_choice = choose_part_type()
     unit_name, conversion_factor = choose_unit()
 
@@ -156,18 +218,27 @@ def calculate_once():
             length_cm, width_cm, height_cm
         )
 
-    weight_g = volume_cm3 * density
-    weight_kg = weight_g / 1000
+    weight_kg = calculate_weight(volume_cm3, density)
+    weight_g = weight_kg * 1000
+    record = create_part_record(part_name, quantity, weight_kg)
 
     print("\n计算结果：")
+    print("零件名称：", part_name)
+    print("数量：", quantity)
     print("体积：", round(volume_cm3, 2), "cm^3")
     print("重量：", round(weight_g, 2), "g")
     print("重量：", round(weight_kg, 3), "kg")
+    print("该批次总重量：", round(record["total_weight_kg"], 3), "kg")
+
+    return record
 
 
 def main():
+    records = []
+
     while True:
-        calculate_once()
+        record = calculate_once()
+        records.append(record)
 
         while True:
             again = input(
@@ -180,6 +251,7 @@ def main():
             print("输入错误：请输入 y 或 n。")
 
         if again == "n":
+            print_summary(records)
             print("程序已结束。")
             break
 
