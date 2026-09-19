@@ -29,12 +29,15 @@ class WeightCalculationTests(unittest.TestCase):
         self.assertEqual(weight_kg, 7.85)
 
     def test_create_part_record_calculates_batch_weight(self):
-        record = weight_calculator.create_part_record("轴套 A", 4, 1.25)
+        record = weight_calculator.create_part_record(
+            "轴套 A", "黄铜", 4, 1.25
+        )
 
         self.assertEqual(
             record,
             {
                 "name": "轴套 A",
+                "material_name": "黄铜",
                 "quantity": 4,
                 "unit_weight_kg": 1.25,
                 "total_weight_kg": 5.0,
@@ -43,8 +46,8 @@ class WeightCalculationTests(unittest.TestCase):
 
     def test_calculate_summary_totals(self):
         records = [
-            weight_calculator.create_part_record("轴套 A", 4, 1.25),
-            weight_calculator.create_part_record("底板 B", 2, 3.8),
+            weight_calculator.create_part_record("轴套 A", "钢", 4, 1.25),
+            weight_calculator.create_part_record("底板 B", "铝", 2, 3.8),
         ]
 
         total_quantity, total_weight_kg = (
@@ -53,6 +56,48 @@ class WeightCalculationTests(unittest.TestCase):
 
         self.assertEqual(total_quantity, 6)
         self.assertAlmostEqual(total_weight_kg, 12.6)
+
+    @patch("builtins.print")
+    def test_summary_prints_material_name(self, mock_print):
+        records = [
+            weight_calculator.create_part_record("轴套 A", "黄铜", 4, 1.25)
+        ]
+
+        weight_calculator.print_summary(records)
+
+        self.assertTrue(
+            any("黄铜" in str(call) for call in mock_print.call_args_list)
+        )
+
+
+class MaterialInputTests(unittest.TestCase):
+    @patch("builtins.input", side_effect=["1"])
+    @patch("builtins.print")
+    def test_builtin_material_is_still_available(self, mock_print, mock_input):
+        material = weight_calculator.choose_material()
+
+        self.assertEqual(material, ("钢", 7.85))
+
+    @patch("builtins.input", side_effect=["5", "黄铜", "8.5"])
+    @patch("builtins.print")
+    def test_choose_custom_material(self, mock_print, mock_input):
+        material = weight_calculator.choose_material()
+
+        self.assertEqual(material, ("黄铜", 8.5))
+
+    @patch("builtins.input", side_effect=["   ", "黄铜", "abc", "0", "8.5"])
+    @patch("builtins.print")
+    def test_custom_material_rejects_invalid_name_and_density(
+        self, mock_print, mock_input
+    ):
+        material = weight_calculator.read_custom_material()
+
+        self.assertEqual(material, ("黄铜", 8.5))
+        mock_print.assert_any_call(
+            "输入错误：材料名称不能为空，请重新输入。"
+        )
+        mock_print.assert_any_call("输入错误：请输入数字，例如 10 或 10.5。")
+        mock_print.assert_any_call("输入错误：数值必须大于 0，请重新输入。")
 
 
 class PartTypeInputTests(unittest.TestCase):

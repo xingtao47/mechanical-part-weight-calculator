@@ -1,7 +1,7 @@
 import math
 
 
-VERSION = "1.4"
+VERSION = "1.5"
 MATERIALS = {
     "1": ("钢", 7.85),
     "2": ("铝", 2.70),
@@ -88,18 +88,34 @@ def choose_unit():
         print("输入错误：请选择 1、2 或 3。")
 
 
+def read_custom_material():
+    while True:
+        material_name = input("请输入自定义材料名称：").strip()
+
+        if material_name:
+            break
+
+        print("输入错误：材料名称不能为空，请重新输入。")
+
+    density = read_positive_number("请输入材料密度（g/cm^3）：")
+    return material_name, density
+
+
 def choose_material():
     print("\n请选择材料：")
     for option, (material_name, _) in MATERIALS.items():
         print(f"{option}. {material_name}")
+    print("5. 自定义材料")
 
     while True:
-        material_choice = input("请输入选项 1/2/3/4：").strip()
+        material_choice = input("请输入选项 1/2/3/4/5：").strip()
 
         if material_choice in MATERIALS:
             return MATERIALS[material_choice]
+        if material_choice == "5":
+            return read_custom_material()
 
-        print("输入错误：请选择 1、2、3 或 4。")
+        print("输入错误：请选择 1、2、3、4 或 5。")
 
 
 def calculate_solid_cylinder_volume(diameter_cm, length_cm):
@@ -123,9 +139,10 @@ def calculate_weight(volume_cm3, density_g_per_cm3):
     return volume_cm3 * density_g_per_cm3 / 1000
 
 
-def create_part_record(name, quantity, unit_weight_kg):
+def create_part_record(name, material_name, quantity, unit_weight_kg):
     return {
         "name": name,
+        "material_name": material_name,
         "quantity": quantity,
         "unit_weight_kg": unit_weight_kg,
         "total_weight_kg": unit_weight_kg * quantity,
@@ -142,18 +159,22 @@ def print_summary(records):
     total_quantity, total_weight_kg = calculate_summary_totals(records)
 
     print("\n零件汇总：")
-    print(f"{'零件名称':<16}{'数量':>6}{'单件重量':>16}{'小计':>16}")
-    print("-" * 54)
+    print(
+        f"{'零件名称':<14}{'材料':<10}{'数量':>6}"
+        f"{'单件重量':>16}{'小计':>16}"
+    )
+    print("-" * 66)
 
     for record in records:
         print(
-            f"{record['name']:<16}"
+            f"{record['name']:<14}"
+            f"{record['material_name']:<10}"
             f"{record['quantity']:>6}"
             f"{record['unit_weight_kg']:>13.3f} kg"
             f"{record['total_weight_kg']:>13.3f} kg"
         )
 
-    print("-" * 54)
+    print("-" * 66)
     print(f"总数量：{total_quantity}")
     print(f"总重量：{total_weight_kg:.3f} kg")
 
@@ -220,7 +241,7 @@ def calculate_once():
 
     weight_kg = calculate_weight(volume_cm3, density)
     weight_g = weight_kg * 1000
-    record = create_part_record(part_name, quantity, weight_kg)
+    record = create_part_record(part_name, material_name, quantity, weight_kg)
 
     print("\n计算结果：")
     print("零件名称：", part_name)
