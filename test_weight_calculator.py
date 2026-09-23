@@ -1,5 +1,8 @@
+import csv
 import math
+import tempfile
 import unittest
+from datetime import datetime
 from unittest.mock import patch
 
 import weight_calculator
@@ -144,6 +147,63 @@ class PartInformationInputTests(unittest.TestCase):
         self.assertEqual(quantity, 4)
         self.assertEqual(mock_input.call_count, 5)
         self.assertEqual(mock_print.call_count, 4)
+
+
+class CsvExportTests(unittest.TestCase):
+    def test_export_records_to_csv(self):
+        records = [
+            weight_calculator.create_part_record("轴套 A", "钢", 4, 1.25),
+            weight_calculator.create_part_record("底板 B", "铝", 2, 3.8),
+        ]
+        export_time = datetime(2026, 9, 23, 15, 30, 0)
+
+        with tempfile.TemporaryDirectory() as temp_directory:
+            file_path = weight_calculator.export_records_to_csv(
+                records, temp_directory, export_time
+            )
+
+            self.assertEqual(
+                file_path.name, "weight_summary_20260923_153000.csv"
+            )
+            with file_path.open(encoding="utf-8-sig", newline="") as csv_file:
+                rows = list(csv.reader(csv_file))
+
+        self.assertEqual(
+            rows[0],
+            ["零件名称", "材料", "数量", "单件重量(kg)", "总重量(kg)"],
+        )
+        self.assertEqual(rows[1], ["轴套 A", "钢", "4", "1.250", "5.000"])
+        self.assertEqual(rows[2], ["底板 B", "铝", "2", "3.800", "7.600"])
+        self.assertEqual(rows[3], ["合计", "", "6", "", "12.600"])
+
+    @patch("builtins.input", side_effect=["maybe", "Y"])
+    @patch("builtins.print")
+    def test_read_yes_no_retries_invalid_input(self, mock_print, mock_input):
+        answer = weight_calculator.read_yes_no("是否保存：")
+
+        self.assertTrue(answer)
+        self.assertEqual(mock_input.call_count, 2)
+        mock_print.assert_called_with("输入错误：请输入 y 或 n。")
+
+    @patch("weight_calculator.export_records_to_csv")
+    @patch("builtins.input", side_effect=["n"])
+    def test_skip_csv_export(self, mock_input, mock_export):
+        weight_calculator.offer_csv_export([])
+
+        mock_export.assert_not_called()
+
+    @patch(
+        "weight_calculator.export_records_to_csv",
+        side_effect=OSError("磁盘空间不足"),
+    )
+    @patch("builtins.input", side_effect=["y"])
+    @patch("builtins.print")
+    def test_csv_export_reports_save_error(
+        self, mock_print, mock_input, mock_export
+    ):
+        weight_calculator.offer_csv_export([])
+
+        mock_print.assert_called_with("CSV 文件保存失败：磁盘空间不足")
 
 
 if __name__ == "__main__":

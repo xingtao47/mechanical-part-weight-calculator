@@ -1,7 +1,10 @@
+import csv
 import math
+from datetime import datetime
+from pathlib import Path
 
 
-VERSION = "1.5"
+VERSION = "1.6"
 MATERIALS = {
     "1": ("钢", 7.85),
     "2": ("铝", 2.70),
@@ -40,6 +43,18 @@ def read_positive_integer(prompt):
             print("输入错误：数量必须是正整数，请重新输入。")
         except ValueError:
             print("输入错误：数量必须是正整数，请重新输入。")
+
+
+def read_yes_no(prompt):
+    while True:
+        answer = input(prompt).strip().lower()
+
+        if answer == "y":
+            return True
+        if answer == "n":
+            return False
+
+        print("输入错误：请输入 y 或 n。")
 
 
 def read_inner_diameter(outer_diameter):
@@ -155,6 +170,61 @@ def calculate_summary_totals(records):
     return total_quantity, total_weight_kg
 
 
+def export_records_to_csv(
+    records, export_directory="exports", export_time=None
+):
+    export_directory = Path(export_directory)
+    export_directory.mkdir(parents=True, exist_ok=True)
+
+    if export_time is None:
+        export_time = datetime.now()
+
+    timestamp = export_time.strftime("%Y%m%d_%H%M%S")
+    file_path = export_directory / f"weight_summary_{timestamp}.csv"
+    total_quantity, total_weight_kg = calculate_summary_totals(records)
+
+    with file_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(
+            ["零件名称", "材料", "数量", "单件重量(kg)", "总重量(kg)"]
+        )
+
+        for record in records:
+            writer.writerow(
+                [
+                    record["name"],
+                    record["material_name"],
+                    record["quantity"],
+                    f"{record['unit_weight_kg']:.3f}",
+                    f"{record['total_weight_kg']:.3f}",
+                ]
+            )
+
+        writer.writerow(
+            ["合计", "", total_quantity, "", f"{total_weight_kg:.3f}"]
+        )
+
+    return file_path.resolve()
+
+
+def offer_csv_export(records):
+    should_export = read_yes_no(
+        "\n是否将零件清单保存为 CSV 文件？输入 y 保存，输入 n 跳过："
+    )
+
+    if not should_export:
+        return None
+
+    try:
+        file_path = export_records_to_csv(records)
+    except OSError as error:
+        print(f"CSV 文件保存失败：{error}")
+        return None
+
+    print(f"CSV 文件已保存：{file_path}")
+    return file_path
+
+
 def print_summary(records):
     total_quantity, total_weight_kg = calculate_summary_totals(records)
 
@@ -261,18 +331,13 @@ def main():
         record = calculate_once()
         records.append(record)
 
-        while True:
-            again = input(
-                "\n是否继续计算？输入 y 继续，输入 n 结束："
-            ).strip().lower()
+        should_continue = read_yes_no(
+            "\n是否继续计算？输入 y 继续，输入 n 结束："
+        )
 
-            if again in ("y", "n"):
-                break
-
-            print("输入错误：请输入 y 或 n。")
-
-        if again == "n":
+        if not should_continue:
             print_summary(records)
+            offer_csv_export(records)
             print("程序已结束。")
             break
 
