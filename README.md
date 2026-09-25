@@ -1,26 +1,47 @@
 # 机械零件重量计算器 V2.0
 
-这是一个使用 Python 编写的 Windows 桌面程序，用于计算实心圆柱、空心圆柱和矩形块零件的重量。
+[![自动测试](https://github.com/xingtao47/mechanical-part-weight-calculator/actions/workflows/tests.yml/badge.svg)](https://github.com/xingtao47/mechanical-part-weight-calculator/actions/workflows/tests.yml)
 
-## 功能
+一个可离线使用的 Windows 桌面工具，用于计算常见机械零件的体积、单件重量和批次总重量。
 
-- 支持毫米（mm）、厘米（cm）和米（m）
-- 支持钢、铝、铜和钛
-- 支持输入自定义材料名称和密度
-- 支持实心圆柱、空心圆柱和矩形块
-- 自动检查空心圆柱的内径是否小于外径
-- 自动计算圆柱体积和重量
-- 自动处理无效选项、文字、零和负数
-- 支持连续计算多个零件
-- 支持为零件填写名称和数量
-- 自动计算同类零件的批次总重量
-- 计算结束时显示包含材料名称的零件清单、总数量和总重量
-- 支持将最终零件清单导出为 CSV 文件
-- 导出的 CSV 文件可直接使用 Excel 打开
-- 使用 Windows 图形界面填写参数和查看计算结果
-- 支持在表格中删除零件、清空清单并查看总重量
-- 导出时可以自行选择 CSV 文件的保存位置和文件名
-- 打包后的 EXE 运行时不显示黑色终端窗口
+## 下载最新版
+
+**[前往 GitHub Releases 下载 Windows 版本](https://github.com/xingtao47/mechanical-part-weight-calculator/releases/latest)**
+
+在最新 Release 的 Assets 区域下载 `机械零件重量计算器-V2.0.zip`，完整解压后双击 EXE 即可使用，不需要安装 Python。
+
+## 软件界面
+
+![机械零件重量计算器 V2.0 主界面](docs/images/v2.0-main-window.png)
+
+## 系统要求
+
+- 面向 64 位 Windows 10 和 Windows 11。
+- 使用 EXE 时不需要安装 Python。
+- 软件完全离线运行，不上传或收集输入的数据。
+- EXE 尚未进行商业代码签名。Windows 首次运行时可能显示安全提醒，请先确认文件来自本仓库的正式 Release。
+
+## 使用方法
+
+1. 填写零件名称和数量。
+2. 选择零件类型和尺寸单位。
+3. 输入尺寸并选择材料。
+4. 点击“计算并添加”。
+5. 在右侧查看单件重量、批次重量和零件清单。
+6. 需要保存时点击“导出 CSV”，选择保存位置和文件名。
+
+## 主要功能
+
+- 支持实心圆柱、空心圆柱和矩形块。
+- 支持毫米（mm）、厘米（cm）和米（m）。
+- 内置钢、铝、铜和钛的常用近似密度。
+- 支持输入自定义材料名称和密度。
+- 自动检查空心圆柱内径必须小于外径。
+- 自动处理空值、文字、零、负数和无效数量。
+- 支持连续添加多个零件并汇总总数量和总重量。
+- 支持删除选中零件和清空清单。
+- 支持导出可由 Excel 直接打开的 CSV 文件。
+- 保留原有命令行版本。
 
 ## 计算公式
 
@@ -40,71 +61,95 @@
 
 `重量 = 体积 × 材料密度`
 
-## 图形界面运行方法
-
-在项目文件夹的终端中输入：
-
-```powershell
-python weight_calculator_gui.py
-```
-
-程序会打开 Windows 桌面窗口。在左侧输入零件参数，点击“计算并添加”，右侧会显示计算结果和零件清单。
-
-点击“导出 CSV”后，可以自行选择保存位置和文件名。默认文件名会包含保存时间，例如：
-
-```text
-weight_summary_20260923_153000.csv
-```
-
-继续使用原来的命令行版本：
-
-```powershell
-python weight_calculator.py
-```
-
-运行自动检查：
-
-```powershell
-python -m unittest -v
-```
-
-## 打包 Windows EXE
-
-在项目文件夹的 PowerShell 终端中运行：
-
-```powershell
-.\build_exe.ps1
-```
-
-打包完成后，EXE 位于 `dist` 文件夹中：
-
-```text
-机械零件重量计算器-V2.0.exe
-```
-
-## 使用的材料密度
+## 材料密度
 
 - 钢：7.85 g/cm³
 - 铝：2.70 g/cm³
 - 铜：8.96 g/cm³
 - 钛：4.51 g/cm³
-- 自定义材料：由用户输入材料名称和密度
+- 自定义材料：由用户输入名称和密度
 
-以上密度为常用近似值，实际材料密度可能存在差异。
+材料密度为常用近似值，实际结果会受到具体牌号和材料状态影响。
 
-## 学习内容
+## 常见问题
 
-这个项目练习了 Python 的变量、函数、条件判断、循环、异常处理、数学库、用户输入、列表、字典、数据汇总和自动测试。
+### 双击 EXE 后 Windows 显示安全提醒怎么办？
+
+这是因为当前独立开发版本尚未购买商业代码签名证书。请只从本仓库的正式 Release 下载文件，并在确认来源后决定是否运行。
+
+### 为什么关闭软件后清单没有保留？
+
+V2.0 不会自动保存清单。需要保留结果时，请在关闭前点击“导出 CSV”。
+
+### 可以在 macOS 或 Linux 上运行吗？
+
+GitHub Release 中的 EXE 只能在 Windows 上运行。Python 源代码可在安装了 Python 和 Tkinter 的其他系统上尝试运行，但目前未作兼容性保证。
+
+### 计算结果可以直接用于设计或采购吗？
+
+软件结果适合估算和辅助核对。正式设计、报价或采购前，请核对实际材料密度、公差和工程要求。
+
+## 反馈问题和建议
+
+- **[报告程序错误](https://github.com/xingtao47/mechanical-part-weight-calculator/issues/new?template=bug_report.yml)**
+- **[提出新功能建议](https://github.com/xingtao47/mechanical-part-weight-calculator/issues/new?template=feature_request.yml)**
+- 参与开发请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+提交截图时，请遮挡用户名、本地文件路径和其他隐私信息。
+
+## 开发者运行方法
+
+需要 Python 3.12 或兼容版本。
+
+运行图形界面：
+
+```powershell
+python weight_calculator_gui.py
+```
+
+运行原来的命令行版本：
+
+```powershell
+python weight_calculator.py
+```
+
+运行全部自动测试：
+
+```powershell
+python -m unittest -v
+```
+
+每次推送到 `main` 或创建 Pull Request 时，GitHub Actions 也会自动运行这些测试。
+
+## 打包 Windows EXE
+
+先安装 PyInstaller：
+
+```powershell
+python -m pip install pyinstaller
+```
+
+然后在项目文件夹的 PowerShell 终端运行：
+
+```powershell
+.\build_exe.ps1
+```
+
+打包完成后，EXE 位于 `dist` 文件夹中。
 
 ## 版本记录
 
-- V2.0：新增 Windows 桌面图形界面、零件清单表格、弹窗错误提示和“另存为”CSV；EXE 运行时不再显示终端窗口。
-- V1.6：新增 CSV 清单导出，自动生成带时间的文件名和合计行。
-- V1.5：新增自定义材料和密度输入，汇总清单增加材料名称。
-- V1.4：新增零件名称、数量、批次重量和最终汇总清单。
-- V1.3：新增矩形块体积和重量计算。
+- V2.0：新增 Windows 桌面图形界面、零件清单、弹窗错误提示和“另存为”CSV。
+- V1.6：新增 CSV 清单导出和合计行。
+- V1.5：新增自定义材料和密度。
+- V1.4：新增零件名称、数量、批次重量和汇总清单。
+- V1.3：新增矩形块计算。
 - V1.2：新增空心圆柱计算和内外径检查。
-- V1.1：新增钛材料，并使用材料表自动生成材料菜单。
-- V1.0：实现实心圆柱零件重量计算，支持钢、铝和铜。
+- V1.1：新增钛材料。
+- V1.0：实现实心圆柱重量计算。
 
-每个正式版本都使用 Git 标签保存，可用 `git tag` 查看版本列表。
+完整记录请查看 [CHANGELOG.md](CHANGELOG.md)。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE)。

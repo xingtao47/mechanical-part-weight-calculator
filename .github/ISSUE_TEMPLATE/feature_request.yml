@@ -1,0 +1,32 @@
+name: 新功能建议
+description: 建议增加零件、材料、计算方式或使用体验改进
+title: "[建议] "
+body:
+  - type: markdown
+    attributes:
+      value: 感谢你帮助改进机械零件重量计算器。
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 请说明你在什么情况下需要这个功能。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 希望增加的功能
+      description: 请尽量具体说明零件、材料、单位或操作方式。
+    validations:
+      required: true
+  - type: textarea
+    id: benefit
+    attributes:
+      label: 这个功能解决什么问题
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 可以提供示例、公式来源或不含隐私信息的截图。

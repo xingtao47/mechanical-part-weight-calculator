@@ -1,0 +1,56 @@
+name: 程序错误反馈
+description: 报告无法启动、计算错误、导出失败或界面异常
+title: "[错误] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你的反馈。请不要在截图或文字中包含用户名、文件路径等隐私信息。
+  - type: input
+    id: app-version
+    attributes:
+      label: 软件版本
+      description: 可以在窗口标题或下载文件名中查看。
+      placeholder: 例如 V2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: windows-version
+    attributes:
+      label: Windows 版本
+      options:
+        - Windows 11 64 位
+        - Windows 10 64 位
+        - 其他 Windows 版本
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题描述
+      description: 请说明实际发生了什么。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 重现步骤
+      description: 请按顺序列出出现问题前的操作。
+      placeholder: |
+        1. 打开软件
+        2. 选择……
+        3. 点击……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+      description: 你原本希望软件怎样运行？
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图或补充信息
+      description: 可以把不含隐私信息的截图拖到这里。
