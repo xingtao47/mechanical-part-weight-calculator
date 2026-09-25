@@ -1,6 +1,7 @@
 import math
 import tkinter as tk
 from datetime import datetime
+from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 import weight_calculator
@@ -142,7 +143,8 @@ class WeightCalculatorApp:
         self.root = root
         self.records = []
         self.dimension_entries = {}
-        self.has_unexported_changes = False
+        self.current_project_path = None
+        self.has_unsaved_changes = False
 
         self._configure_window()
         self._create_variables()
@@ -369,6 +371,12 @@ class WeightCalculatorApp:
             action_frame, text="清空清单", command=self._clear_records
         ).pack(side="left", padx=4)
         ttk.Button(
+            action_frame, text="打开清单", command=self._open_project
+        ).pack(side="left", padx=4)
+        ttk.Button(
+            action_frame, text="保存清单", command=self._save_project
+        ).pack(side="left", padx=4)
+        ttk.Button(
             action_frame,
             text="导出 CSV",
             command=self._export_csv,
@@ -445,7 +453,7 @@ class WeightCalculatorApp:
         self.batch_weight_result_var.set(
             f"{record['total_weight_kg']:.3f} kg"
         )
-        self.has_unexported_changes = True
+        self.has_unsaved_changes = True
         self._refresh_summary()
 
     def _clear_inputs(self):
@@ -475,7 +483,7 @@ class WeightCalculatorApp:
         for item in selected_items:
             self.tree.delete(item)
 
-        self.has_unexported_changes = True
+        self.has_unsaved_changes = True
         self._refresh_summary()
 
     def _clear_records(self):
@@ -494,7 +502,7 @@ class WeightCalculatorApp:
         self.records.clear()
         for item in self.tree.get_children():
             self.tree.delete(item)
-        self.has_unexported_changes = True
+        self.has_unsaved_changes = True
         self._refresh_summary()
 
     def _refresh_summary(self):
@@ -503,6 +511,112 @@ class WeightCalculatorApp:
         )
         self.summary_var.set(
             f"总数量：{total_quantity}    总重量：{total_weight_kg:.3f} kg"
+        )
+
+    def _refresh_records_table(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        for record in self.records:
+            self.tree.insert(
+                "",
+                "end",
+                values=(
+                    record["name"],
+                    record["material_name"],
+                    record["quantity"],
+                    f"{record['unit_weight_kg']:.3f}",
+                    f"{record['total_weight_kg']:.3f}",
+                ),
+            )
+
+        self._refresh_summary()
+
+    def _open_project(self):
+        file_path = filedialog.askopenfilename(
+            parent=self.root,
+            title="打开零件清单",
+            filetypes=(
+                ("机械零件清单", "*.mpwc"),
+                ("所有文件", "*.*"),
+            ),
+        )
+        if not file_path:
+            return
+
+        if self.has_unsaved_changes:
+            should_open = messagebox.askyesno(
+                "未保存的修改",
+                "当前清单有尚未保存的修改，继续打开会丢失这些修改。\n\n"
+                "确定要继续吗？",
+                parent=self.root,
+            )
+            if not should_open:
+                return
+
+        try:
+            loaded_records = weight_calculator.load_project_file(file_path)
+        except (OSError, ValueError) as error:
+            messagebox.showerror(
+                "打开失败", f"无法打开清单文件：{error}", parent=self.root
+            )
+            return
+
+        self.records = loaded_records
+        self.current_project_path = Path(file_path).resolve()
+        self.has_unsaved_changes = False
+        self._refresh_records_table()
+        self.volume_result_var.set("等待计算")
+        self.unit_weight_result_var.set("等待计算")
+        self.batch_weight_result_var.set("等待计算")
+        messagebox.showinfo(
+            "打开成功",
+            f"已打开零件清单：\n{self.current_project_path}",
+            parent=self.root,
+        )
+
+    def _save_project(self):
+        if not self.records:
+            messagebox.showinfo(
+                "保存清单", "请先计算并添加至少一个零件。", parent=self.root
+            )
+            return
+
+        file_path = self.current_project_path
+        if file_path is None:
+            default_name = datetime.now().strftime(
+                "weight_project_%Y%m%d_%H%M%S.mpwc"
+            )
+            selected_path = filedialog.asksaveasfilename(
+                parent=self.root,
+                title="保存零件清单",
+                defaultextension=".mpwc",
+                initialfile=default_name,
+                filetypes=(
+                    ("机械零件清单", "*.mpwc"),
+                    ("所有文件", "*.*"),
+                ),
+            )
+            if not selected_path:
+                return
+            file_path = Path(selected_path)
+
+        try:
+            saved_path = weight_calculator.save_project_file(
+                self.records, file_path
+            )
+        except (OSError, ValueError) as error:
+            messagebox.showerror(
+                "保存失败", f"清单文件保存失败：{error}", parent=self.root
+            )
+            return
+
+        self.current_project_path = saved_path
+        self.has_unsaved_changes = False
+        messagebox.showinfo(
+            "保存成功",
+            f"零件清单已保存：\n{saved_path}",
+            parent=self.root,
         )
 
     def _export_csv(self):
@@ -533,16 +647,15 @@ class WeightCalculatorApp:
             )
             return
 
-        self.has_unexported_changes = False
         messagebox.showinfo(
             "导出成功", f"CSV 文件已保存：\n{saved_path}", parent=self.root
         )
 
     def _on_close(self):
-        if self.records and self.has_unexported_changes:
+        if self.has_unsaved_changes:
             should_close = messagebox.askyesno(
                 "确认退出",
-                "当前零件清单尚未导出，确定要关闭软件吗？",
+                "当前零件清单有尚未保存的修改，确定要关闭软件吗？",
                 parent=self.root,
             )
             if not should_close:

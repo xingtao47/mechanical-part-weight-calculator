@@ -1,8 +1,10 @@
 import csv
+import json
 import math
 import tempfile
 import unittest
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import patch
 
 import weight_calculator
@@ -204,6 +206,67 @@ class CsvExportTests(unittest.TestCase):
         weight_calculator.offer_csv_export([])
 
         mock_print.assert_called_with("CSV 文件保存失败：磁盘空间不足")
+
+
+class ProjectFileTests(unittest.TestCase):
+    def test_save_and_load_project_preserves_full_precision(self):
+        records = [
+            weight_calculator.create_part_record(
+                "精密轴 A", "钢", 3, 0.123456789012345
+            )
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_directory:
+            project_path = Path(temp_directory) / "测试清单.mpwc"
+            saved_path = weight_calculator.save_project_file(
+                records, project_path
+            )
+            loaded_records = weight_calculator.load_project_file(project_path)
+
+            self.assertEqual(saved_path, project_path.resolve())
+            self.assertEqual(loaded_records, records)
+
+    def test_load_project_rejects_unknown_file_format(self):
+        with tempfile.TemporaryDirectory() as temp_directory:
+            project_path = Path(temp_directory) / "错误格式.mpwc"
+            project_path.write_text(
+                json.dumps(
+                    {
+                        "format": "other-program",
+                        "format_version": 1,
+                        "records": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "不是有效的机械零件清单"):
+                weight_calculator.load_project_file(project_path)
+
+    def test_load_project_rejects_invalid_record(self):
+        with tempfile.TemporaryDirectory() as temp_directory:
+            project_path = Path(temp_directory) / "损坏清单.mpwc"
+            project_path.write_text(
+                json.dumps(
+                    {
+                        "format": "mechanical-part-weight-calculator",
+                        "format_version": 1,
+                        "records": [
+                            {
+                                "name": "错误零件",
+                                "material_name": "钢",
+                                "quantity": 0,
+                                "unit_weight_kg": 1.0,
+                                "total_weight_kg": 0.0,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "零件记录无效"):
+                weight_calculator.load_project_file(project_path)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,13 @@
 import csv
+import json
 import math
 from datetime import datetime
 from pathlib import Path
 
 
-VERSION = "2.0"
+VERSION = "2.1"
+PROJECT_FILE_FORMAT = "mechanical-part-weight-calculator"
+PROJECT_FORMAT_VERSION = 1
 MATERIALS = {
     "1": ("钢", 7.85),
     "2": ("铝", 2.70),
@@ -168,6 +171,99 @@ def calculate_summary_totals(records):
     total_quantity = sum(record["quantity"] for record in records)
     total_weight_kg = sum(record["total_weight_kg"] for record in records)
     return total_quantity, total_weight_kg
+
+
+def _validate_project_record(record, index):
+    if not isinstance(record, dict):
+        raise ValueError(f"第 {index} 条零件记录无效。")
+
+    name = record.get("name")
+    material_name = record.get("material_name")
+    quantity = record.get("quantity")
+    unit_weight_kg = record.get("unit_weight_kg")
+    total_weight_kg = record.get("total_weight_kg")
+
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(f"第 {index} 条零件记录无效：零件名称为空。")
+    if not isinstance(material_name, str) or not material_name.strip():
+        raise ValueError(f"第 {index} 条零件记录无效：材料名称为空。")
+    if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+        raise ValueError(f"第 {index} 条零件记录无效：数量必须是正整数。")
+
+    for field_name, value in (
+        ("单件重量", unit_weight_kg),
+        ("总重量", total_weight_kg),
+    ):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value <= 0
+        ):
+            raise ValueError(
+                f"第 {index} 条零件记录无效：{field_name}必须大于 0。"
+            )
+
+    expected_total = unit_weight_kg * quantity
+    if not math.isclose(
+        total_weight_kg, expected_total, rel_tol=1e-12, abs_tol=1e-12
+    ):
+        raise ValueError(f"第 {index} 条零件记录无效：总重量不匹配。")
+
+    return {
+        "name": name.strip(),
+        "material_name": material_name.strip(),
+        "quantity": quantity,
+        "unit_weight_kg": float(unit_weight_kg),
+        "total_weight_kg": float(total_weight_kg),
+    }
+
+
+def save_project_file(records, file_path):
+    file_path = Path(file_path)
+    validated_records = [
+        _validate_project_record(record, index)
+        for index, record in enumerate(records, start=1)
+    ]
+    project_data = {
+        "format": PROJECT_FILE_FORMAT,
+        "format_version": PROJECT_FORMAT_VERSION,
+        "app_version": VERSION,
+        "records": validated_records,
+    }
+
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    with file_path.open("w", encoding="utf-8") as project_file:
+        json.dump(project_data, project_file, ensure_ascii=False, indent=2)
+
+    return file_path.resolve()
+
+
+def load_project_file(file_path):
+    file_path = Path(file_path)
+    try:
+        with file_path.open(encoding="utf-8") as project_file:
+            project_data = json.load(project_file)
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise ValueError("清单文件内容损坏，无法打开。") from error
+
+    if (
+        not isinstance(project_data, dict)
+        or project_data.get("format") != PROJECT_FILE_FORMAT
+    ):
+        raise ValueError("这不是有效的机械零件清单文件。")
+
+    if project_data.get("format_version") != PROJECT_FORMAT_VERSION:
+        raise ValueError("清单文件版本不受支持。")
+
+    records = project_data.get("records")
+    if not isinstance(records, list):
+        raise ValueError("清单文件内容损坏：缺少零件记录。")
+
+    return [
+        _validate_project_record(record, index)
+        for index, record in enumerate(records, start=1)
+    ]
 
 
 def export_records_to_csv_file(records, file_path):

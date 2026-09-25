@@ -1,4 +1,4 @@
-# 机械零件重量计算器 V2.0
+# 机械零件重量计算器 V2.1
 
 [![自动测试](https://github.com/xingtao47/mechanical-part-weight-calculator/actions/workflows/tests.yml/badge.svg)](https://github.com/xingtao47/mechanical-part-weight-calculator/actions/workflows/tests.yml)
 
@@ -8,7 +8,7 @@
 
 **[前往 GitHub Releases 下载 Windows 版本](https://github.com/xingtao47/mechanical-part-weight-calculator/releases/latest)**
 
-在最新 Release 的 Assets 区域下载 `机械零件重量计算器-V2.0.zip`，完整解压后双击 EXE 即可使用，不需要安装 Python。
+在最新 Release 的 Assets 区域下载 `机械零件重量计算器-V2.1.zip`，完整解压后双击 EXE 即可使用，不需要安装 Python。
 
 ## 软件界面
 
@@ -28,7 +28,9 @@
 3. 输入尺寸并选择材料。
 4. 点击“计算并添加”。
 5. 在右侧查看单件重量、批次重量和零件清单。
-6. 需要保存时点击“导出 CSV”，选择保存位置和文件名。
+6. 需要以后继续处理时点击“保存清单”，生成 `.mpwc` 文件。
+7. 下次使用时点击“打开清单”，选择以前保存的 `.mpwc` 文件。
+8. 需要用 Excel 查看或分享结果时点击“导出 CSV”。
 
 ## 主要功能
 
@@ -40,6 +42,7 @@
 - 自动处理空值、文字、零、负数和无效数量。
 - 支持连续添加多个零件并汇总总数量和总重量。
 - 支持删除选中零件和清空清单。
+- 支持保存和重新打开 `.mpwc` 零件清单。
 - 支持导出可由 Excel 直接打开的 CSV 文件。
 - 保留原有命令行版本。
 
@@ -77,9 +80,9 @@
 
 这是因为当前独立开发版本尚未购买商业代码签名证书。请只从本仓库的正式 Release 下载文件，并在确认来源后决定是否运行。
 
-### 为什么关闭软件后清单没有保留？
+### 怎样在下次打开软件时继续使用原来的清单？
 
-V2.0 不会自动保存清单。需要保留结果时，请在关闭前点击“导出 CSV”。
+关闭前点击“保存清单”并妥善保管生成的 `.mpwc` 文件。下次启动软件后点击“打开清单”，选择该文件即可继续使用。CSV 主要用于 Excel 查看和分享，不能代替项目文件。
 
 ### 可以在 macOS 或 Linux 上运行吗？
 
@@ -139,6 +142,7 @@ python -m pip install pyinstaller
 
 ## 版本记录
 
+- V2.1：新增 `.mpwc` 零件清单的保存、打开、格式校验和未保存提醒。
 - V2.0：新增 Windows 桌面图形界面、零件清单、弹窗错误提示和“另存为”CSV。
 - V1.6：新增 CSV 清单导出和合计行。
 - V1.5：新增自定义材料和密度。
