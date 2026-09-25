@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-VERSION = "1.6"
+VERSION = "2.0"
 MATERIALS = {
     "1": ("钢", 7.85),
     "2": ("铝", 2.70),
@@ -170,17 +170,9 @@ def calculate_summary_totals(records):
     return total_quantity, total_weight_kg
 
 
-def export_records_to_csv(
-    records, export_directory="exports", export_time=None
-):
-    export_directory = Path(export_directory)
-    export_directory.mkdir(parents=True, exist_ok=True)
-
-    if export_time is None:
-        export_time = datetime.now()
-
-    timestamp = export_time.strftime("%Y%m%d_%H%M%S")
-    file_path = export_directory / f"weight_summary_{timestamp}.csv"
+def export_records_to_csv_file(records, file_path):
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     total_quantity, total_weight_kg = calculate_summary_totals(records)
 
     with file_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
@@ -205,6 +197,19 @@ def export_records_to_csv(
         )
 
     return file_path.resolve()
+
+
+def export_records_to_csv(
+    records, export_directory="exports", export_time=None
+):
+    export_directory = Path(export_directory)
+
+    if export_time is None:
+        export_time = datetime.now()
+
+    timestamp = export_time.strftime("%Y%m%d_%H%M%S")
+    file_path = export_directory / f"weight_summary_{timestamp}.csv"
+    return export_records_to_csv_file(records, file_path)
 
 
 def offer_csv_export(records):

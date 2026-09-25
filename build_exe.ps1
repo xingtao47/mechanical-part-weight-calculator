@@ -6,6 +6,7 @@ Set-Location -LiteralPath $projectDirectory
 $pythonCommand = Get-Command python -ErrorAction Stop
 $pythonPath = $pythonCommand.Source
 $sourceFile = Join-Path $projectDirectory "weight_calculator.py"
+$entryFile = Join-Path $projectDirectory "weight_calculator_gui.py"
 $versionLine = Select-String -LiteralPath $sourceFile -Pattern '^VERSION = "([^"]+)"$'
 
 if (-not $versionLine) {
@@ -25,9 +26,9 @@ if ($LASTEXITCODE -ne 0) {
     --noconfirm `
     --clean `
     --onefile `
-    --console `
+    --windowed `
     --name $programName `
-    weight_calculator.py
+    $entryFile
 
 if ($LASTEXITCODE -ne 0) {
     throw "EXE 打包失败。"
