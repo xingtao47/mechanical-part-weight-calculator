@@ -18,6 +18,7 @@ UNITS = {
     "厘米（cm）": 1,
     "米（m）": 100,
 }
+UNIT_CODES = {"毫米（mm）": "mm", "厘米（cm）": "cm", "米（m）": "m"}
 
 MATERIALS_BY_NAME = {
     material_name: density
@@ -87,17 +88,11 @@ def calculate_part_from_inputs(
     if unit_name not in UNITS:
         raise ValueError("请选择有效的尺寸单位。")
 
-    conversion_factor = UNITS[unit_name]
-    dimensions_cm = {}
+    dimensions = {}
     for field_key, field_label in DIMENSION_FIELDS[part_type_name]:
-        value = parse_positive_number(
+        dimensions[field_key] = parse_positive_number(
             dimension_values.get(field_key, ""), field_label
         )
-        dimensions_cm[field_key] = value * conversion_factor
-
-    if part_type_name == "空心圆柱":
-        if dimensions_cm["inner_diameter"] >= dimensions_cm["outer_diameter"]:
-            raise ValueError("内径必须小于外径。")
 
     if material_choice == CUSTOM_MATERIAL:
         material_name = custom_material_name.strip()
@@ -110,27 +105,25 @@ def calculate_part_from_inputs(
     else:
         raise ValueError("请选择有效的材料。")
 
-    if part_type_name == "实心圆柱":
-        volume_cm3 = weight_calculator.calculate_solid_cylinder_volume(
-            dimensions_cm["diameter"], dimensions_cm["length"]
-        )
-    elif part_type_name == "空心圆柱":
-        volume_cm3 = weight_calculator.calculate_hollow_cylinder_volume(
-            dimensions_cm["outer_diameter"],
-            dimensions_cm["inner_diameter"],
-            dimensions_cm["length"],
-        )
-    else:
-        volume_cm3 = weight_calculator.calculate_rectangular_prism_volume(
-            dimensions_cm["length"],
-            dimensions_cm["width"],
-            dimensions_cm["height"],
-        )
-
-    unit_weight_kg = weight_calculator.calculate_weight(volume_cm3, density)
-    record = weight_calculator.create_part_record(
-        part_name, material_name, quantity, unit_weight_kg
+    # Preserve dimensions in the entered unit, without rounding or converting back.
+    volume_cm3 = weight_calculator.calculate_volume_from_parameters(
+        PART_TYPES[part_type_name], UNIT_CODES[unit_name], dimensions
     )
+    try:
+        unit_weight_kg = weight_calculator.calculate_weight(volume_cm3, density)
+        record = weight_calculator.create_part_record(
+            part_name, material_name, quantity, unit_weight_kg
+        )
+    except OverflowError as error:
+        raise ValueError("计算结果过大，请检查尺寸、密度和数量。") from error
+    record["inputs"] = {
+        "part_type": PART_TYPES[part_type_name],
+        "unit": UNIT_CODES[unit_name],
+        "dimensions": dimensions,
+        "density_g_per_cm3": density,
+        "custom_material": material_choice == CUSTOM_MATERIAL,
+    }
+    record = weight_calculator._validate_project_record(record, 1)
     return {
         "record": record,
         "volume_cm3": volume_cm3,
@@ -145,6 +138,9 @@ class WeightCalculatorApp:
         self.dimension_entries = {}
         self.current_project_path = None
         self.has_unsaved_changes = False
+        self.editing_item = None
+        self.edit_baseline = None
+        self.legacy_edit = False
 
         self._configure_window()
         self._create_variables()
@@ -187,6 +183,7 @@ class WeightCalculatorApp:
         self.unit_weight_result_var = tk.StringVar(value="等待计算")
         self.batch_weight_result_var = tk.StringVar(value="等待计算")
         self.summary_var = tk.StringVar(value="总数量：0    总重量：0.000 kg")
+        self.edit_hint_var = tk.StringVar(value="双击清单中的零件，或点击“修改选中项”进行修改。")
 
     def _create_widgets(self):
         header = ttk.Frame(self.root, padding=(20, 16, 20, 8))
@@ -210,8 +207,26 @@ class WeightCalculatorApp:
         self._create_results_panel(content)
 
     def _create_input_panel(self, parent):
-        panel = ttk.LabelFrame(parent, text="零件参数", padding=16)
-        panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.input_panel = ttk.LabelFrame(parent, text="零件参数", padding=10)
+        self.input_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.input_panel.columnconfigure(0, weight=1)
+        self.input_panel.rowconfigure(0, weight=1)
+        self.input_canvas = tk.Canvas(self.input_panel, width=320, highlightthickness=0)
+        self.input_canvas.grid(row=0, column=0, sticky="nsew")
+        input_scrollbar = ttk.Scrollbar(
+            self.input_panel, orient="vertical", command=self.input_canvas.yview
+        )
+        input_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.input_canvas.configure(yscrollcommand=input_scrollbar.set)
+        panel = self.input_body = ttk.Frame(self.input_canvas)
+        input_window = self.input_canvas.create_window((0, 0), window=panel, anchor="nw")
+        panel.bind("<Configure>", lambda _event: self.input_canvas.configure(
+            scrollregion=self.input_canvas.bbox("all")
+        ))
+        self.input_canvas.bind("<Configure>", lambda event: self.input_canvas.itemconfigure(
+            input_window, width=event.width
+        ))
+        self.root.bind("<MouseWheel>", self._scroll_inputs)
         panel.columnconfigure(1, weight=1)
 
         self._add_labeled_entry(panel, 0, "零件名称", self.part_name_var)
@@ -286,15 +301,23 @@ class WeightCalculatorApp:
         )
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
-        ttk.Button(
+        self.submit_button = ttk.Button(
             button_frame,
             text="计算并添加",
             command=self._calculate_and_add,
             style="Primary.TButton",
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        ttk.Button(
+        )
+        self.submit_button.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        self.reset_button = ttk.Button(
             button_frame, text="清空输入", command=self._clear_inputs
-        ).grid(row=0, column=1, sticky="ew", padx=(5, 0))
+        )
+        self.reset_button.grid(row=0, column=1, sticky="ew", padx=(5, 0))
+        ttk.Label(panel, textvariable=self.edit_hint_var, wraplength=310).grid(
+            row=8, column=0, columnspan=2, sticky="w", pady=(12, 0)
+        )
+        self.parameter_widgets = [
+            widget for row in range(2, 7) for widget in panel.grid_slaves(row=row)
+        ]
 
     def _create_results_panel(self, parent):
         panel = ttk.LabelFrame(parent, text="计算结果与零件清单", padding=16)
@@ -329,6 +352,7 @@ class WeightCalculatorApp:
         self.tree = ttk.Treeview(
             table_frame, columns=columns, show="headings", selectmode="extended"
         )
+        self.tree.bind("<Double-1>", self._on_double_click)
         headings = {
             "name": "零件名称",
             "material": "材料",
@@ -354,6 +378,11 @@ class WeightCalculatorApp:
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.grid(row=0, column=0, sticky="nsew")
         scrollbar.grid(row=0, column=1, sticky="ns")
+        horizontal_scrollbar = ttk.Scrollbar(
+            table_frame, orient="horizontal", command=self.tree.xview
+        )
+        self.tree.configure(xscrollcommand=horizontal_scrollbar.set)
+        horizontal_scrollbar.grid(row=1, column=0, sticky="ew")
 
         footer = ttk.Frame(panel)
         footer.grid(row=2, column=0, sticky="ew", pady=(12, 0))
@@ -363,21 +392,26 @@ class WeightCalculatorApp:
         ).grid(row=0, column=0, sticky="w")
 
         action_frame = ttk.Frame(footer)
-        action_frame.grid(row=0, column=1, sticky="e")
+        action_frame.grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Button(
+            action_frame, text="修改选中项", command=self._edit_selected
+        ).pack(side="left", padx=(0, 4))
         ttk.Button(
             action_frame, text="删除选中项", command=self._delete_selected
         ).pack(side="left", padx=4)
         ttk.Button(
             action_frame, text="清空清单", command=self._clear_records
         ).pack(side="left", padx=4)
+        file_frame = ttk.Frame(footer)
+        file_frame.grid(row=2, column=0, sticky="w", pady=(8, 0))
         ttk.Button(
-            action_frame, text="打开清单", command=self._open_project
+            file_frame, text="打开清单", command=self._open_project
+        ).pack(side="left", padx=(0, 4))
+        ttk.Button(
+            file_frame, text="保存清单", command=self._save_project
         ).pack(side="left", padx=4)
         ttk.Button(
-            action_frame, text="保存清单", command=self._save_project
-        ).pack(side="left", padx=4)
-        ttk.Button(
-            action_frame,
+            file_frame,
             text="导出 CSV",
             command=self._export_csv,
             style="Primary.TButton",
@@ -412,41 +446,57 @@ class WeightCalculatorApp:
         else:
             self.custom_material_frame.grid_remove()
 
+    def _scroll_inputs(self, event):
+        if event.widget is self.input_canvas or str(event.widget).startswith(str(self.input_body) + "."):
+            self.input_canvas.yview_scroll(-int(event.delta / 120), "units")
+            return "break"
+
     def _calculate_and_add(self):
         dimension_values = {
             key: entry.get() for key, entry in self.dimension_entries.items()
         }
 
         try:
-            calculation = calculate_part_from_inputs(
-                self.part_name_var.get(),
-                self.quantity_var.get(),
-                self.part_type_var.get(),
-                self.unit_var.get(),
-                dimension_values,
-                self.material_var.get(),
-                self.custom_material_var.get(),
-                self.custom_density_var.get(),
-            )
-        except ValueError as error:
+            if self.legacy_edit:
+                name = self.part_name_var.get().strip()
+                if not name:
+                    raise ValueError("零件名称不能为空。")
+                original = self.records[self.tree.index(self.editing_item)]
+                record = weight_calculator.create_part_record(
+                    name, original["material_name"],
+                    parse_positive_integer(self.quantity_var.get()), original["unit_weight_kg"],
+                )
+                record = weight_calculator._validate_project_record(record, 1)
+                calculation = {"record": record, "volume_cm3": None}
+            else:
+                calculation = calculate_part_from_inputs(
+                    self.part_name_var.get(),
+                    self.quantity_var.get(),
+                    self.part_type_var.get(),
+                    self.unit_var.get(),
+                    dimension_values,
+                    self.material_var.get(),
+                    self.custom_material_var.get(),
+                    self.custom_density_var.get(),
+                )
+        except (ValueError, OverflowError) as error:
             messagebox.showerror("输入错误", str(error), parent=self.root)
-            return
+            return False
 
         record = calculation["record"]
-        self.records.append(record)
-        self.tree.insert(
-            "",
-            "end",
-            values=(
-                record["name"],
-                record["material_name"],
-                record["quantity"],
-                f"{record['unit_weight_kg']:.3f}",
-                f"{record['total_weight_kg']:.3f}",
-            ),
-        )
+        if self.editing_item is None:
+            self.records.append(record)
+            self.tree.insert("", "end", values=self._record_values(record))
+        else:
+            item = self.editing_item
+            self.records[self.tree.index(item)] = record
+            self.tree.item(item, values=self._record_values(record))
+            self.tree.selection_set(item)
+            self.tree.see(item)
+            self._reset_inputs()
 
-        self.volume_result_var.set(f"{calculation['volume_cm3']:.2f} cm³")
+        volume = calculation["volume_cm3"]
+        self.volume_result_var.set("未保存尺寸" if volume is None else f"{volume:.2f} cm³")
         self.unit_weight_result_var.set(
             f"{record['unit_weight_kg']:.3f} kg"
         )
@@ -455,8 +505,113 @@ class WeightCalculatorApp:
         )
         self.has_unsaved_changes = True
         self._refresh_summary()
+        return True
+
+    @staticmethod
+    def _record_values(record):
+        return (
+            record["name"], record["material_name"], record["quantity"],
+            f"{record['unit_weight_kg']:.3f}", f"{record['total_weight_kg']:.3f}",
+        )
+
+    def _form_state(self):
+        return (
+            self.part_name_var.get(), self.quantity_var.get(),
+            self.part_type_var.get(), self.unit_var.get(), self.material_var.get(),
+            self.custom_material_var.get(), self.custom_density_var.get(),
+            {key: entry.get() for key, entry in self.dimension_entries.items()},
+        )
+
+    def _edit_has_changes(self):
+        return self.editing_item is not None and self._form_state() != self.edit_baseline
+
+    def _confirm_discard_edit(self):
+        return not self._edit_has_changes() or messagebox.askyesno(
+            "尚未更新的零件", "当前零件的修改尚未更新到清单，确定要放弃这些修改吗？",
+            parent=self.root,
+        )
+
+    def _resolve_pending_edit(self):
+        if not self._edit_has_changes():
+            return True
+        answer = messagebox.askyesnocancel(
+            "尚未更新的零件",
+            "当前零件的修改尚未更新到清单。是否先更新再继续？\n\n"
+            "选择“是”更新，选择“否”放弃修改，选择“取消”返回编辑。",
+            parent=self.root,
+        )
+        if answer is None:
+            return False
+        if answer:
+            return self._calculate_and_add()
+        self._reset_inputs()
+        return True
+
+    def _on_double_click(self, event):
+        if self.tree.identify_region(event.x, event.y) not in ("cell", "tree"):
+            return
+        item = self.tree.identify_row(event.y)
+        if item:
+            self._edit_selected(item)
+            return "break"
+
+    def _edit_selected(self, item=None):
+        if item is None:
+            selection = self.tree.selection()
+            if len(selection) != 1:
+                messagebox.showinfo("修改零件", "请在清单中选择一个要修改的零件。", parent=self.root)
+                return
+            item = selection[0]
+        if item == self.editing_item or not self._confirm_discard_edit():
+            return
+        record = self.records[self.tree.index(item)]
+        self._reset_inputs()
+        self.editing_item = item
+        self.tree.selection_set(item)
+        self.part_name_var.set(record["name"])
+        self.quantity_var.set(str(record["quantity"]))
+        inputs = record.get("inputs")
+        self.legacy_edit = inputs is None
+        self.input_panel.configure(text="修改零件")
+        self.reset_button.configure(text="取消修改")
+        if inputs is None:
+            for widget in self.parameter_widgets:
+                widget.grid_remove()
+            self.submit_button.configure(text="更新名称和数量")
+            self.edit_hint_var.set(
+                f"正在修改：{record['name']}\n旧版记录未保存尺寸，仅可修改名称和数量。"
+                "材料与单件重量保持原值。"
+            )
+        else:
+            self.part_type_var.set(next(name for name, code in PART_TYPES.items() if code == inputs["part_type"]))
+            self.unit_var.set(next(name for name, code in UNIT_CODES.items() if code == inputs["unit"]))
+            self._refresh_dimension_fields()
+            for key, value in inputs["dimensions"].items():
+                self.dimension_entries[key].insert(0, str(value))
+            self.material_var.set(CUSTOM_MATERIAL if inputs["custom_material"] else record["material_name"])
+            if inputs["custom_material"]:
+                self.custom_material_var.set(record["material_name"])
+                self.custom_density_var.set(str(inputs["density_g_per_cm3"]))
+            self._toggle_custom_material_fields()
+            self.submit_button.configure(text="计算并更新")
+            self.edit_hint_var.set(f"正在修改：{record['name']}\n点击“计算并更新”替换原记录，点击“取消修改”放弃。")
+        self.edit_baseline = self._form_state()
+        self.input_canvas.yview_moveto(0)
 
     def _clear_inputs(self):
+        if self._confirm_discard_edit():
+            self._reset_inputs()
+
+    def _reset_inputs(self):
+        self.editing_item = None
+        self.edit_baseline = None
+        self.legacy_edit = False
+        self.input_panel.configure(text="零件参数")
+        self.submit_button.configure(text="计算并添加")
+        self.reset_button.configure(text="清空输入")
+        self.edit_hint_var.set("双击清单中的零件，或点击“修改选中项”进行修改。")
+        for widget in self.parameter_widgets:
+            widget.grid()
         self.part_name_var.set("")
         self.quantity_var.set("1")
         self.part_type_var.set("实心圆柱")
@@ -466,6 +621,7 @@ class WeightCalculatorApp:
         self.custom_density_var.set("")
         self._refresh_dimension_fields()
         self._toggle_custom_material_fields()
+        self.input_canvas.yview_moveto(0)
 
     def _delete_selected(self):
         selected_items = self.tree.selection()
@@ -478,6 +634,10 @@ class WeightCalculatorApp:
         selected_indices = sorted(
             (self.tree.index(item) for item in selected_items), reverse=True
         )
+        if self.editing_item in selected_items:
+            if not self._confirm_discard_edit():
+                return
+            self._reset_inputs()
         for index in selected_indices:
             del self.records[index]
         for item in selected_items:
@@ -499,6 +659,7 @@ class WeightCalculatorApp:
         if not should_clear:
             return
 
+        self._reset_inputs()
         self.records.clear()
         for item in self.tree.get_children():
             self.tree.delete(item)
@@ -518,17 +679,7 @@ class WeightCalculatorApp:
             self.tree.delete(item)
 
         for record in self.records:
-            self.tree.insert(
-                "",
-                "end",
-                values=(
-                    record["name"],
-                    record["material_name"],
-                    record["quantity"],
-                    f"{record['unit_weight_kg']:.3f}",
-                    f"{record['total_weight_kg']:.3f}",
-                ),
-            )
+            self.tree.insert("", "end", values=self._record_values(record))
 
         self._refresh_summary()
 
@@ -544,6 +695,8 @@ class WeightCalculatorApp:
         if not file_path:
             return
 
+        if not self._resolve_pending_edit():
+            return
         if self.has_unsaved_changes:
             should_open = messagebox.askyesno(
                 "未保存的修改",
@@ -563,6 +716,7 @@ class WeightCalculatorApp:
             return
 
         self.records = loaded_records
+        self._reset_inputs()
         self.current_project_path = Path(file_path).resolve()
         self.has_unsaved_changes = False
         self._refresh_records_table()
@@ -576,6 +730,8 @@ class WeightCalculatorApp:
         )
 
     def _save_project(self):
+        if not self._resolve_pending_edit():
+            return
         if not self.records:
             messagebox.showinfo(
                 "保存清单", "请先计算并添加至少一个零件。", parent=self.root
@@ -620,6 +776,8 @@ class WeightCalculatorApp:
         )
 
     def _export_csv(self):
+        if not self._resolve_pending_edit():
+            return
         if not self.records:
             messagebox.showinfo(
                 "导出 CSV", "请先计算并添加至少一个零件。", parent=self.root
@@ -652,6 +810,8 @@ class WeightCalculatorApp:
         )
 
     def _on_close(self):
+        if not self._resolve_pending_edit():
+            return
         if self.has_unsaved_changes:
             should_close = messagebox.askyesno(
                 "确认退出",

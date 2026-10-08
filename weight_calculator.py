@@ -5,9 +5,15 @@ from datetime import datetime
 from pathlib import Path
 
 
-VERSION = "2.1"
+VERSION = "2.2"
 PROJECT_FILE_FORMAT = "mechanical-part-weight-calculator"
-PROJECT_FORMAT_VERSION = 1
+PROJECT_FORMAT_VERSION = 2
+PART_DIMENSION_KEYS = {
+    "solid_cylinder": ("diameter", "length"),
+    "hollow_cylinder": ("outer_diameter", "inner_diameter", "length"),
+    "rectangular_prism": ("length", "width", "height"),
+}
+UNIT_FACTORS = {"mm": 0.1, "cm": 1, "m": 100}
 MATERIALS = {
     "1": ("钢", 7.85),
     "2": ("铝", 2.70),
@@ -157,6 +163,74 @@ def calculate_weight(volume_cm3, density_g_per_cm3):
     return volume_cm3 * density_g_per_cm3 / 1000
 
 
+def _positive_finite_number(value, label):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label}必须是大于 0 的有限数字。")
+    try:
+        number = float(value)
+    except (ValueError, OverflowError) as error:
+        raise ValueError(f"{label}数值过大。") from error
+    if not math.isfinite(number) or number <= 0:
+        raise ValueError(f"{label}必须是大于 0 的有限数字。")
+    return number
+
+
+def calculate_volume_from_parameters(part_type, unit, dimensions):
+    if not isinstance(part_type, str) or part_type not in PART_DIMENSION_KEYS:
+        raise ValueError("零件类型无效。")
+    if not isinstance(unit, str) or unit not in UNIT_FACTORS:
+        raise ValueError("尺寸单位无效。")
+    if not isinstance(dimensions, dict):
+        raise ValueError("尺寸数据无效。")
+    converted = {
+        key: _positive_finite_number(dimensions.get(key), "尺寸") * UNIT_FACTORS[unit]
+        for key in PART_DIMENSION_KEYS[part_type]
+    }
+    try:
+        if part_type == "solid_cylinder":
+            volume = calculate_solid_cylinder_volume(converted["diameter"], converted["length"])
+        elif part_type == "hollow_cylinder":
+            if converted["inner_diameter"] >= converted["outer_diameter"]:
+                raise ValueError("内径必须小于外径。")
+            volume = calculate_hollow_cylinder_volume(
+                converted["outer_diameter"], converted["inner_diameter"], converted["length"]
+            )
+        else:
+            volume = calculate_rectangular_prism_volume(
+                converted["length"], converted["width"], converted["height"]
+            )
+    except OverflowError as error:
+        raise ValueError("尺寸数值过大，请检查输入。") from error
+    return _positive_finite_number(volume, "计算体积")
+
+
+def _validate_project_inputs(inputs, record, index):
+    if not isinstance(inputs, dict):
+        raise ValueError(f"第 {index} 条零件记录无效：计算参数损坏。")
+    part_type = inputs.get("part_type")
+    unit = inputs.get("unit")
+    dimensions = inputs.get("dimensions")
+    volume = calculate_volume_from_parameters(part_type, unit, dimensions)
+    density = _positive_finite_number(inputs.get("density_g_per_cm3"), "材料密度")
+    custom_material = inputs.get("custom_material")
+    if not isinstance(custom_material, bool):
+        raise ValueError(f"第 {index} 条零件记录无效：材料类型损坏。")
+    if not custom_material:
+        builtin_density = dict(MATERIALS.values()).get(record["material_name"])
+        if builtin_density != density:
+            raise ValueError(f"第 {index} 条零件记录无效：内置材料和密度不匹配。")
+    expected_weight = _positive_finite_number(calculate_weight(volume, density), "计算重量")
+    if not math.isclose(record["unit_weight_kg"], expected_weight, rel_tol=1e-12, abs_tol=0):
+        raise ValueError(f"第 {index} 条零件记录无效：尺寸、密度与重量不匹配。")
+    return {
+        "part_type": part_type,
+        "unit": unit,
+        "dimensions": {key: float(dimensions[key]) for key in PART_DIMENSION_KEYS[part_type]},
+        "density_g_per_cm3": density,
+        "custom_material": custom_material,
+    }
+
+
 def create_part_record(name, material_name, quantity, unit_weight_kg):
     return {
         "name": name,
@@ -190,33 +264,27 @@ def _validate_project_record(record, index):
     if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
         raise ValueError(f"第 {index} 条零件记录无效：数量必须是正整数。")
 
-    for field_name, value in (
-        ("单件重量", unit_weight_kg),
-        ("总重量", total_weight_kg),
-    ):
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not math.isfinite(value)
-            or value <= 0
-        ):
-            raise ValueError(
-                f"第 {index} 条零件记录无效：{field_name}必须大于 0。"
-            )
-
-    expected_total = unit_weight_kg * quantity
+    unit_weight_kg = _positive_finite_number(unit_weight_kg, f"第 {index} 条零件单件重量")
+    total_weight_kg = _positive_finite_number(total_weight_kg, f"第 {index} 条零件总重量")
+    try:
+        expected_total = unit_weight_kg * quantity
+    except OverflowError as error:
+        raise ValueError(f"第 {index} 条零件记录无效：数量过大。") from error
     if not math.isclose(
         total_weight_kg, expected_total, rel_tol=1e-12, abs_tol=1e-12
     ):
         raise ValueError(f"第 {index} 条零件记录无效：总重量不匹配。")
 
-    return {
+    validated = {
         "name": name.strip(),
         "material_name": material_name.strip(),
         "quantity": quantity,
         "unit_weight_kg": float(unit_weight_kg),
         "total_weight_kg": float(total_weight_kg),
     }
+    if "inputs" in record:
+        validated["inputs"] = _validate_project_inputs(record["inputs"], validated, index)
+    return validated
 
 
 def save_project_file(records, file_path):
@@ -253,7 +321,8 @@ def load_project_file(file_path):
     ):
         raise ValueError("这不是有效的机械零件清单文件。")
 
-    if project_data.get("format_version") != PROJECT_FORMAT_VERSION:
+    format_version = project_data.get("format_version")
+    if type(format_version) is not int or format_version not in (1, PROJECT_FORMAT_VERSION):
         raise ValueError("清单文件版本不受支持。")
 
     records = project_data.get("records")

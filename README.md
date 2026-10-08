@@ -1,18 +1,23 @@
-# 机械零件重量计算器 V2.1
+# 机械零件重量计算器 V2.2
 
 [![自动测试](https://github.com/xingtao47/mechanical-part-weight-calculator/actions/workflows/tests.yml/badge.svg)](https://github.com/xingtao47/mechanical-part-weight-calculator/actions/workflows/tests.yml)
 
 一个可离线使用的 Windows 桌面工具，用于计算常见机械零件的体积、单件重量和批次总重量。
 
-## 下载最新版
+## 运行 V2.2
+
+本地打包完成后，双击 `dist/机械零件重量计算器-V2.2.exe` 即可使用，不需要安装 Python。
+分享时可使用 `dist/机械零件重量计算器-V2.2.zip`。
+
+## 下载已发布版本
 
 **[前往 GitHub Releases 下载 Windows 版本](https://github.com/xingtao47/mechanical-part-weight-calculator/releases/latest)**
 
-在最新 Release 的 Assets 区域下载 `机械零件重量计算器-V2.1.zip`，完整解压后双击 EXE 即可使用，不需要安装 Python。
+在最新 Release 的 Assets 区域下载 Windows ZIP，完整解压后双击 EXE 即可使用，不需要安装 Python。当前本地 V2.2 尚未发布到 Release。
 
 ## 软件界面
 
-![机械零件重量计算器 V2.0 主界面](docs/images/v2.0-main-window.png)
+![机械零件重量计算器 V2.0 主界面（V2.2 增加编辑按钮与输入区滚动条）](docs/images/v2.0-main-window.png)
 
 ## 系统要求
 
@@ -31,6 +36,8 @@
 6. 需要以后继续处理时点击“保存清单”，生成 `.mpwc` 文件。
 7. 下次使用时点击“打开清单”，选择以前保存的 `.mpwc` 文件。
 8. 需要用 Excel 查看或分享结果时点击“导出 CSV”。
+9. 需要修改时，双击清单中的零件，或选中一个零件后点击“修改选中项”。
+10. 修改左侧参数后点击“计算并更新”，会替换原来的记录并刷新合计；“取消修改”可放弃本次修改。
 
 ## 主要功能
 
@@ -42,6 +49,9 @@
 - 自动处理空值、文字、零、负数和无效数量。
 - 支持连续添加多个零件并汇总总数量和总重量。
 - 支持删除选中零件和清空清单。
+- 支持修改已有零件的名称、数量、形状、尺寸、单位和材料，重新计算后更新原行。
+- 保存清单时保留尺寸、单位、密度和自定义材料状态，重新打开后仍可编辑。
+- 支持读取 V2.1 旧清单；旧记录没有尺寸，只能修改名称和数量，保留原有单件重量。
 - 支持保存和重新打开 `.mpwc` 零件清单。
 - 支持导出可由 Excel 直接打开的 CSV 文件。
 - 保留原有命令行版本。
@@ -87,6 +97,12 @@
 ### 可以在 macOS 或 Linux 上运行吗？
 
 GitHub Release 中的 EXE 只能在 Windows 上运行。Python 源代码可在安装了 Python 和 Tkinter 的其他系统上尝试运行，但目前未作兼容性保证。
+
+### 为什么旧清单不能修改尺寸？
+
+V2.1 只保存了名称、材料、数量和重量，无法恢复原始形状和尺寸。因此旧记录仅能修改名称和数量。要按尺寸重新计算，请重新输入参数并添加新记录；V2.2 新添加的记录会保存完整参数。
+
+V2.2 保存的清单采用文件格式第 2 版，需要使用 V2.2 或更新版本打开。覆盖旧清单前，建议保留原文件的副本，便于继续用 V2.1 查看。
 
 ### 计算结果可以直接用于设计或采购吗？
 
@@ -142,6 +158,7 @@ python -m pip install pyinstaller
 
 ## 版本记录
 
+- V2.2：新增零件编辑、完整计算参数保存、旧清单兼容及编辑中的修改提醒。
 - V2.1：新增 `.mpwc` 零件清单的保存、打开、格式校验和未保存提醒。
 - V2.0：新增 Windows 桌面图形界面、零件清单、弹窗错误提示和“另存为”CSV。
 - V1.6：新增 CSV 清单导出和合计行。
