@@ -4,16 +4,13 @@
 
 一个可离线使用的 Windows 桌面工具，用于计算常见机械零件的体积、单件重量和批次总重量。
 
-## 运行 V2.2
-
-本地打包完成后，双击 `dist/机械零件重量计算器-V2.2.exe` 即可使用，不需要安装 Python。
-分享时可使用 `dist/机械零件重量计算器-V2.2.zip`。
-
-## 下载已发布版本
+## 下载最新版
 
 **[前往 GitHub Releases 下载 Windows 版本](https://github.com/xingtao47/mechanical-part-weight-calculator/releases/latest)**
 
-在最新 Release 的 Assets 区域下载 Windows ZIP，完整解压后双击 EXE 即可使用，不需要安装 Python。当前本地 V2.2 尚未发布到 Release。
+**[直接下载 V2.2 Windows ZIP](https://github.com/xingtao47/mechanical-part-weight-calculator/releases/download/v2.2/Mechanical-Part-Weight-Calculator-V2.2-Windows.zip)**
+
+下载 `Mechanical-Part-Weight-Calculator-V2.2-Windows.zip`，完整解压后双击 `机械零件重量计算器-V2.2.exe` 即可使用，不需要安装 Python。ZIP 包含软件、中文使用说明和许可证。
 
 ## 软件界面
 
