@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-VERSION = "2.2"
+VERSION = "2.3"
 PROJECT_FILE_FORMAT = "mechanical-part-weight-calculator"
 PROJECT_FORMAT_VERSION = 2
 PART_DIMENSION_KEYS = {

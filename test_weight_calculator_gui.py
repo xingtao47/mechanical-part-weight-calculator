@@ -288,6 +288,80 @@ class GuiEditingTests(unittest.TestCase):
         finally:
             self.root.withdraw()
 
+    def diagram_labels(self):
+        canvas = self.app.part_diagram
+        return {
+            canvas.itemcget(item, "text") for item in canvas.find_withtag("dimension_label")
+        }
+
+    def test_shape_selection_switches_diagram_and_dimension_fields_together(self):
+        expected = {
+            "实心圆柱": {"直径", "长度"},
+            "空心圆柱": {"外径", "内径", "长度"},
+            "矩形块": {"长度", "宽度", "高度"},
+        }
+        self.root.geometry("980x620+10000+10000")
+        self.root.deiconify()
+        try:
+            for name, labels in expected.items():
+                with self.subTest(shape=name):
+                    self.app.part_type_var.set(name)
+                    self.app.part_type_box.event_generate("<<ComboboxSelected>>")
+                    self.root.update()
+                    self.assertEqual(self.diagram_labels(), labels)
+                    self.assertEqual(set(self.app.dimension_entries), {
+                        key for key, _label in weight_calculator_gui.DIMENSION_FIELDS[name]
+                    })
+                    self.assertFalse(self.app.has_unsaved_changes)
+        finally:
+            self.root.withdraw()
+
+    def test_edit_restores_saved_shape_diagram(self):
+        item = self.add_part(
+            part_type_name="矩形块",
+            dimension_values={"length": "10", "width": "5", "height": "2"},
+        )
+        self.app._edit_selected(item)
+        self.assertEqual(self.diagram_labels(), {"长度", "宽度", "高度"})
+        self.app._clear_inputs()
+        self.assertEqual(self.diagram_labels(), {"直径", "长度"})
+
+    def test_legacy_record_does_not_show_invented_geometry(self):
+        self.app.records = [weight_calculator.create_part_record("旧轴", "钢", 2, 1.25)]
+        self.app._refresh_records_table()
+        self.app._edit_selected(self.app.tree.get_children()[0])
+        self.assertEqual(self.diagram_labels(), set())
+        canvas = self.app.part_diagram
+        self.assertIn("未保存形状和尺寸", canvas.itemcget(canvas.find_withtag("unavailable")[0], "text"))
+        self.app._clear_inputs()
+        self.assertEqual(self.diagram_labels(), {"直径", "长度"})
+
+    def test_diagram_resize_keeps_labels_inside_canvas_without_accumulating_items(self):
+        self.root.deiconify()
+        try:
+            for shape in weight_calculator_gui.PART_TYPES:
+                self.app.part_type_var.set(shape)
+                self.app._refresh_dimension_fields()
+                item_count = None
+                for size in ("980x620", "1400x800", "1120x680", "980x620"):
+                    self.root.geometry(size + "+10000+10000")
+                    self.root.update()
+                    canvas = self.app.part_diagram
+                    self.assertTrue(self.app.tree.winfo_ismapped())
+                    self.assertGreaterEqual(self.app.tree.winfo_height(), 80)
+                    count = len(canvas.find_all())
+                    if item_count is None:
+                        item_count = count
+                    self.assertEqual(count, item_count)
+                    for item in canvas.find_withtag("dimension_label"):
+                        left, top, right, bottom = canvas.bbox(item)
+                        self.assertGreaterEqual(left, 0)
+                        self.assertGreaterEqual(top, 0)
+                        self.assertLessEqual(right, canvas.winfo_width())
+                        self.assertLessEqual(bottom, canvas.winfo_height())
+        finally:
+            self.root.withdraw()
+
 
 class GuiInputValidationTests(unittest.TestCase):
     def test_positive_number_accepts_decimal(self):

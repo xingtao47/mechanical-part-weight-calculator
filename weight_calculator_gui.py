@@ -5,6 +5,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 import weight_calculator
+from part_diagram import PartDiagram
 
 
 PART_TYPES = {
@@ -241,6 +242,7 @@ class WeightCalculatorApp:
             values=tuple(PART_TYPES),
             state="readonly",
         )
+        self.part_type_box = part_type_box
         part_type_box.grid(row=2, column=1, sticky="ew", pady=6)
         part_type_box.bind(
             "<<ComboboxSelected>>", lambda _event: self._refresh_dimension_fields()
@@ -323,10 +325,10 @@ class WeightCalculatorApp:
         panel = ttk.LabelFrame(parent, text="计算结果与零件清单", padding=16)
         panel.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
         panel.columnconfigure(0, weight=1)
-        panel.rowconfigure(1, weight=1)
+        panel.rowconfigure(2, weight=1)
 
-        result_frame = ttk.Frame(panel, padding=(12, 8))
-        result_frame.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        result_frame = ttk.Frame(panel, padding=(12, 4))
+        result_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         result_frame.columnconfigure((0, 1, 2), weight=1)
 
         for column, (title, variable) in enumerate(
@@ -343,8 +345,18 @@ class WeightCalculatorApp:
                 pady=(4, 0)
             )
 
+        diagram_frame = ttk.LabelFrame(panel, text="尺寸示意图", padding=(8, 4))
+        diagram_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        diagram_frame.columnconfigure(0, weight=1)
+        self.part_diagram = PartDiagram(diagram_frame)
+        self.part_diagram.grid(row=0, column=0, sticky="ew")
+        ttk.Label(
+            diagram_frame, text="用于识别尺寸位置，图形不按输入尺寸比例绘制。",
+            foreground="#657587", font=("Microsoft YaHei UI", -12), wraplength=420,
+        ).grid(row=1, column=0, sticky="w", pady=(2, 0))
+
         table_frame = ttk.Frame(panel)
-        table_frame.grid(row=1, column=0, sticky="nsew")
+        table_frame.grid(row=2, column=0, sticky="nsew")
         table_frame.columnconfigure(0, weight=1)
         table_frame.rowconfigure(0, weight=1)
 
@@ -385,7 +397,7 @@ class WeightCalculatorApp:
         horizontal_scrollbar.grid(row=1, column=0, sticky="ew")
 
         footer = ttk.Frame(panel)
-        footer.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        footer.grid(row=3, column=0, sticky="ew", pady=(8, 0))
         footer.columnconfigure(0, weight=1)
         ttk.Label(
             footer, textvariable=self.summary_var, style="ResultValue.TLabel"
@@ -439,6 +451,12 @@ class WeightCalculatorApp:
             entry = ttk.Entry(self.dimensions_frame)
             entry.grid(row=row, column=1, sticky="ew", pady=5)
             self.dimension_entries[field_key] = entry
+        self._refresh_diagram()
+
+    def _refresh_diagram(self):
+        self.part_diagram.set_part_type(
+            None if self.legacy_edit else PART_TYPES[self.part_type_var.get()]
+        )
 
     def _toggle_custom_material_fields(self):
         if self.material_var.get() == CUSTOM_MATERIAL:
@@ -595,6 +613,7 @@ class WeightCalculatorApp:
             self._toggle_custom_material_fields()
             self.submit_button.configure(text="计算并更新")
             self.edit_hint_var.set(f"正在修改：{record['name']}\n点击“计算并更新”替换原记录，点击“取消修改”放弃。")
+        self._refresh_diagram()
         self.edit_baseline = self._form_state()
         self.input_canvas.yview_moveto(0)
 
